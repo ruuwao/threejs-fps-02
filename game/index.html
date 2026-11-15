@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>HELIX BREACH — Tactical FPS</title>
+<style>
+  :root {
+    --amber: #f5a524;
+    --cyan: #35c4ff;
+    --ember: #ff5a3c;
+    --ink: #0d1526;
+    --panel: rgba(10, 16, 30, 0.82);
+    --line: rgba(245, 165, 36, 0.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ink); }
+  body { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #e8eef7; }
+  #game { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+  .hidden { display: none !important; }
+
+  /* --- Top bar --- */
+  #topbar { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; z-index: 5; }
+  #round-label { font-size: 11px; letter-spacing: 3px; color: #9fb0c9; text-transform: uppercase; }
+  #timer { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+  #timer.danger { color: var(--ember); }
+  #timer.bomb { color: var(--amber); }
+  #score { font-size: 15px; font-weight: 700; letter-spacing: 2px; }
+  #score .vg { color: var(--cyan); }
+  #score .em { color: var(--ember); }
+  #objective { margin-top: 6px; font-size: 12px; letter-spacing: 1px; color: #c8d4e8; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
+
+  /* --- Crosshair --- */
+  #crosshair { position: fixed; left: 50%; top: 50%; width: 0; height: 0; z-index: 4; pointer-events: none; --gap: 6px; }
+  #crosshair .ch { position: absolute; background: #fff; box-shadow: 0 0 3px #000; }
+  #crosshair .t { width: 2px; height: 9px; left: -1px; top: calc(-1 * var(--gap) - 9px); }
+  #crosshair .b { width: 2px; height: 9px; left: -1px; top: var(--gap); }
+  #crosshair .l { width: 9px; height: 2px; top: -1px; left: calc(-1 * var(--gap) - 9px); }
+  #crosshair .r { width: 9px; height: 2px; top: -1px; left: var(--gap); }
+  #crosshair .dot { width: 2px; height: 2px; left: -1px; top: -1px; }
+  #hitmarker { position: fixed; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; z-index: 4; pointer-events: none; opacity: 0; }
+  #hitmarker::before, #hitmarker::after { content: ""; position: absolute; inset: 0; background:
+    linear-gradient(45deg, transparent 46%, #fff 46% 54%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, #fff 46% 54%, transparent 54%); }
+  #hitmarker.kill::before, #hitmarker.kill::after { background:
+    linear-gradient(45deg, transparent 46%, #ff3b30 46% 54%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, #ff3b30 46% 54%, transparent 54%); }
+  #hitmarker.show { opacity: 1; }
+  #scope { position: fixed; inset: 0; z-index: 4; pointer-events: none; background: radial-gradient(circle at 50% 50%, transparent 34%, rgba(0,0,0,.92) 35%); }
+  #scope::before, #scope::after { content: ""; position: absolute; background: rgba(0,0,0,.9); }
+  #scope::before { left: 50%; top: 0; width: 1px; height: 100%; }
+  #scope::after { top: 50%; left: 0; height: 1px; width: 100%; }
+
+  /* --- Bottom HUD --- */
+  #bottom-left { position: fixed; left: 22px; bottom: 20px; z-index: 5; pointer-events: none; }
+  #health-num { font-size: 44px; font-weight: 800; line-height: 1; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+  #health-num.low { color: var(--ember); }
+  #health-num::after { content: " HP"; font-size: 13px; color: #9fb0c9; letter-spacing: 2px; }
+  .bar { width: 220px; height: 7px; background: rgba(255,255,255,.14); margin-top: 6px; border-radius: 2px; overflow: hidden; }
+  .bar > div { height: 100%; }
+  #health-bar { background: linear-gradient(90deg, #2fd67a, #7be495); width: 100%; }
+  #armor-bar { background: linear-gradient(90deg, #35c4ff, #9be1ff); width: 0%; }
+  #bottom-right { position: fixed; right: 22px; bottom: 20px; z-index: 5; text-align: right; pointer-events: none; }
+  #weapon-name { font-size: 13px; letter-spacing: 2px; color: #c8d4e8; text-transform: uppercase; }
+  #ammo { font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+  #money { font-size: 20px; font-weight: 700; color: var(--amber); font-variant-numeric: tabular-nums; }
+  #grenades { font-size: 11px; letter-spacing: 1px; color: #9fb0c9; margin-top: 4px; }
+
+  /* --- Kill feed / banner / hints --- */
+  #killfeed { position: fixed; right: 22px; top: 76px; z-index: 5; text-align: right; pointer-events: none; }
+  .feed-item { background: var(--panel); border-right: 3px solid #5b6b84; padding: 5px 10px; margin-top: 5px; font-size: 12px; border-radius: 3px; }
+  .feed-item.good { border-right-color: #2fd67a; }
+  .feed-item.bad { border-right-color: var(--ember); }
+  #banner { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.96); text-align: center; z-index: 6; pointer-events: none; opacity: 0; transition: opacity .18s, transform .18s; }
+  #banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #banner-title { font-size: 52px; font-weight: 900; letter-spacing: 8px; text-shadow: 0 4px 24px rgba(0,0,0,.9); }
+  #banner-sub { font-size: 15px; letter-spacing: 2px; color: #c8d4e8; }
+  #hint { position: fixed; left: 50%; bottom: 110px; transform: translateX(-50%); z-index: 5; background: var(--panel); border: 1px solid var(--line); padding: 8px 16px; border-radius: 4px; font-size: 13px; letter-spacing: 1px; pointer-events: none; }
+  #plant-wrap { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); width: 320px; z-index: 5; text-align: center; pointer-events: none; }
+  #plant-label { font-size: 12px; letter-spacing: 2px; margin-bottom: 6px; color: var(--amber); }
+  #plant-wrap .bar { width: 100%; height: 9px; }
+  #plant-fill { background: var(--amber); width: 0%; }
+  #vignette { position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255,30,20,.55) 100%); }
+  #flash { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0; background: #fff; }
+  #damage-dir { position: fixed; left: 50%; top: 50%; width: 130px; height: 130px; margin: -65px 0 0 -65px; z-index: 4; pointer-events: none; opacity: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(255,40,20,.9) 0deg 40deg, transparent 40deg 360deg); -webkit-mask: radial-gradient(circle, transparent 58%, #000 60%); mask: radial-gradient(circle, transparent 58%, #000 60%); }
+
+  /* --- Buy menu --- */
+  #buy-menu { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 460px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; z-index: 8; backdrop-filter: blur(4px); }
+  #buy-menu h2 { font-size: 15px; letter-spacing: 3px; color: var(--amber); }
+  #buy-money { float: right; font-size: 18px; font-weight: 700; color: var(--amber); }
+  #buy-list { margin-top: 12px; }
+  .buy-row { display: flex; width: 100%; gap: 10px; align-items: center; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); color: #e8eef7; padding: 8px 10px; margin-top: 6px; border-radius: 4px; cursor: pointer; font-size: 13px; text-align: left; }
+  .buy-row:hover { background: rgba(245,165,36,.18); border-color: var(--amber); }
+  .buy-key { display: inline-block; min-width: 22px; text-align: center; background: rgba(255,255,255,.12); border-radius: 3px; padding: 2px 0; font-weight: 700; }
+  .buy-name { flex: 1; }
+  .buy-price { color: var(--amber); font-weight: 700; }
+  #buy-menu .note { margin-top: 10px; font-size: 11px; color: #9fb0c9; }
+
+  /* --- Scoreboard --- */
+  #scoreboard { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 520px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; z-index: 8; }
+  #scoreboard h2 { font-size: 14px; letter-spacing: 3px; color: var(--amber); margin-bottom: 10px; }
+  .score-row { display: grid; grid-template-columns: 1fr 90px 80px 80px; font-size: 13px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .score-row.vanguard span:first-child { color: var(--cyan); }
+  .score-row.ember span:first-child { color: var(--ember); }
+  .score-row.me { background: rgba(245,165,36,.12); }
+
+  /* --- Menu / match end --- */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 40%, rgba(13,21,38,.55) 0%, rgba(5,8,16,.88) 100%); text-align: center; }
+  .overlay h1 { font-size: 64px; font-weight: 900; letter-spacing: 12px; }
+  .overlay h1 .hx { color: var(--amber); }
+  .overlay .tag { margin-top: 4px; font-size: 14px; letter-spacing: 4px; color: #9fb0c9; text-transform: uppercase; }
+  .overlay .desc { margin-top: 18px; max-width: 560px; font-size: 14px; line-height: 1.7; color: #c8d4e8; }
+  .overlay .controls { margin-top: 18px; font-size: 12px; line-height: 1.9; color: #9fb0c9; letter-spacing: 1px; }
+  .overlay .controls b { color: #e8eef7; }
+  .big-btn { margin-top: 26px; background: var(--amber); color: #14100a; border: none; font-size: 17px; font-weight: 800; letter-spacing: 3px; padding: 14px 42px; border-radius: 5px; cursor: pointer; }
+  .big-btn:hover { background: #ffb63d; }
+  #match-title { font-size: 56px; }
+  #match-stats { margin-top: 10px; font-size: 15px; color: #c8d4e8; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="topbar">
+  <div id="round-label">ROUND 1 · BUY PHASE</div>
+  <div id="timer">1:40</div>
+  <div id="score"><span class="vg">VANGUARD</span> <span id="score-num">0 — 0</span> <span class="em">EMBER</span></div>
+  <div id="objective"></div>
+</div>
+
+<div id="crosshair"><div class="ch t"></div><div class="ch b"></div><div class="ch l"></div><div class="ch r"></div><div class="ch dot"></div></div>
+<div id="hitmarker"></div>
+<div id="scope" class="hidden"></div>
+<div id="vignette"></div>
+<div id="damage-dir"></div>
+<div id="flash"></div>
+
+<div id="killfeed"></div>
+
+<div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
+<div id="hint" class="hidden"></div>
+<div id="plant-wrap" class="hidden"><div id="plant-label"></div><div class="bar"><div id="plant-fill"></div></div></div>
+
+<div id="bottom-left">
+  <div id="health-num">100</div>
+  <div class="bar"><div id="health-bar"></div></div>
+  <div class="bar"><div id="armor-bar"></div></div>
+</div>
+<div id="bottom-right">
+  <div id="weapon-name">P9 Sidearm</div>
+  <div id="ammo">12 / 36</div>
+  <div id="money">$800</div>
+  <div id="grenades">FRAG 0 · SMOKE 0 · FLASH 0</div>
+</div>
+
+<div id="buy-menu" class="hidden">
+  <h2>BUY MENU <span id="buy-money">$800</span></h2>
+  <div id="buy-list"></div>
+  <div class="note">Buy phase only — press B to close. Keys 1–9 work too. Survive the round to keep your guns.</div>
+</div>
+
+<div id="scoreboard" class="hidden">
+  <h2>SCOREBOARD</h2>
+  <div id="score-rows"></div>
+</div>
+
+<div id="menu" class="overlay">
+  <h1>HELIX <span class="hx">BREACH</span></h1>
+  <div class="tag">5v5 Tactical FPS · First to 5 rounds</div>
+  <div class="desc">
+    Vanguard attacks, Ember defends. Plant the spike at Reactor (A) or Depot (B) and
+    defend it until it blows — or hold the sites and defuse. Earn credits for wins,
+    kills and plants, and buy rifles, armour and grenades between rounds. Five bots
+    fight beside you and five against you.
+  </div>
+  <div class="controls">
+    <b>WASD</b> move · <b>Mouse</b> aim · <b>Click</b> fire · <b>R</b> reload · <b>1/2</b> weapons ·
+    <b>Shift</b> walk · <b>Ctrl</b> crouch · <b>Space</b> jump · <b>B</b> buy · <b>E</b> plant / defuse ·
+    <b>Q</b> grenade type · <b>G</b> throw · <b>Tab</b> scoreboard · <b>M</b> mute
+  </div>
+  <button class="big-btn" id="deploy-btn">DEPLOY</button>
+</div>
+
+<div id="match-end" class="overlay hidden">
+  <h1 id="match-title">VICTORY</h1>
+  <div id="match-stats"></div>
+  <button class="big-btn" id="rematch-btn">PLAY AGAIN</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
